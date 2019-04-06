@@ -403,7 +403,10 @@ LexerTagReadAttrVal_WaitingEqualSign::nextState(char ch)
         case 0:
             if (ch == '=') {
                 data << ch;
-                return make_unique_and_emplace<LexerTagReadAttrVal_WaitingEqualSign>(std::move(*this))->nextState(ch);
+                return std::make_tuple(
+                    make_unique_and_emplace<LexerTagReadAttrVal_WaitingEqualSign>(std::move(*this)),
+                    nullptr,
+                    true);
             } else {
                 return make_unique_and_emplace<LexerTagReadAttr>(std::move(*this))->nextState(ch);
             }
@@ -427,6 +430,7 @@ LexerTagReadAttrVal_WaitingEqualSign::nextState(char ch)
                 return make_unique_and_emplace<LexerTagReadAttr>(std::move(*this))->nextState(ch);
             } else {
                 data = std::stringstream();
+                data << ch;
                 return std::make_tuple(
                     make_unique_and_emplace<LexerTagReadAttrValWrappedByNoQuote>(std::move(*this)),
                     nullptr,

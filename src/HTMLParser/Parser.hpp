@@ -2,100 +2,110 @@
 
 #define _COWR_HTMLPARSER_PARSER
 
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <vector>
 
-#include "HTMLTagAttr.hpp"
-#include "HTMLToken.hpp"
-#include "LexerStates.hpp"
+#include "HTMLElement.hpp"
+#include "Lexer.hpp"
 
 namespace cowr {
 
 class HTMLParser {
-    std::stringstream buffer;
-
-    std::unique_ptr<LexerStateBase> now_state;
+    HTMLLexer lexer;
+    std::shared_ptr<HTMLDocument> pdocument;
 
 public:
     HTMLParser()
-        : now_state(new LexerEmptyState)
+        : pdocument(new HTMLDocument)
     {
+    }
+
+    HTMLParser(std::string html)
+        : HTMLParser()
+    {
+        lexer << html;
+    }
+
+    HTMLParser(std::filesystem::path path)
+        : HTMLParser()
+    {
+        std::ifstream input(path);
+
+        char ch;
+
+        while (input.get(ch))
+            lexer << ch;
+    }
+
+    HTMLParser(std::istream& os)
+        : HTMLParser()
+    {
+        char ch;
+
+        while (os.get(ch))
+            lexer << ch;
+    }
+
+    HTMLParser(std::istream&& os)
+        : HTMLParser()
+    {
+        char ch;
+
+        while (os.get(ch))
+            lexer << ch;
     }
 
     std::vector<std::unique_ptr<HTMLTokenBase>> lexOnly()
     {
-        std::vector<std::unique_ptr<HTMLTokenBase>> ret, tmp;
+        return lexer.lex();
+    }
 
-        char ch;
-        while (buffer.get(ch)) {
-            bool succeed = false;
+    std::shared_ptr<HTMLDocument> parse()
+    {
+        HTMLNonEmptyTagElement* now = pdocument.get();
 
-            while (!succeed) {
-                auto [new_state, token, now_succeed] = now_state->nextState(ch);
-                succeed = now_succeed;
+        auto tokens = lexOnly();
 
-                now_state = std::move(new_state);
+        for (auto&& token : tokens) {
+            auto ptoken = token.get();
 
-                if (token) {
-                    tmp.push_back(std::move(token));
-                }
-            }
-        }
+            if (auto ptag = dynamic_cast<HTMLTagToken*>(ptoken); ptag && ptag->isClose()) {
+                HTMLNonEmptyTagElement* next = now;
 
-        {
-            bool succeed = false;
-
-            while (!succeed) {
-                auto [new_state, token, now_succeed] = now_state->nextState(EOF);
-                succeed = now_succeed;
-
-                now_state = std::move(new_state);
-
-                if (token) {
-                    tmp.push_back(std::move(token));
-                }
-            }
-        }
-
-        {
-            for (auto it = tmp.begin(), end = tmp.end(); it != end; it++) {
-                auto& token = convertToReference(it->get());
-
-                if (auto p_text_token = dynamic_cast<HTMLTextToken*>(&token); p_text_token != nullptr) {
-                    std::stringstream data;
-
-                    for (auto merge = it; merge != end; merge++) {
-                        if (auto p_now = dynamic_cast<HTMLTextToken*>(merge->get()); p_now != nullptr) {
-                            data << p_now->getValue();
-                        } else {
-                            merge--;
-                            it = merge;
-                            break;
-                        }
+                while (next) {
+                    if (next->getTag() == ptag->getValue()) {
+                        break;
                     }
+                    next = next->getParent();
+                }
 
-                    if (data.rdbuf()->in_avail() > 0) {
-                        auto str = data.str();
-                        trim(str);
+                if (next) {
+                    now = next->getParent();
 
-                        if (str.length())
-                            ret.push_back(std::make_unique<HTMLTextToken>(str));
+                    if (!next) {
+                        DEBUG_THROW(std::logic_error, "Unexpected null parent");
                     }
+                }
+            } else {
+                auto element_unique_ptr = HTMLElement::make_unique_from_token(now, token.get());
+                auto pelement = now->addChild(std::move(element_unique_ptr));
 
-                } else {
-                    ret.push_back(std::move(*it));
+                if (auto ptag = dynamic_cast<HTMLNonEmptyTagElement*>(pelement); ptag) {
+                    now = ptag;
                 }
             }
         }
 
-        return ret;
+        return pdocument;
     }
 
     template <typename T>
     HTMLParser& operator<<(T&& t)
     {
-        buffer << t;
+        lexer << t;
         return *this;
     }
 };

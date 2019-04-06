@@ -50,7 +50,9 @@
         "utility": "cpp",
         "algorithm": "cpp",
         "complex": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp"
     },
     "python.linting.pylintEnabled": true
 }

@@ -99,6 +99,11 @@ public:
     {
     }
 
+    auto getAttr() const
+    {
+        return attr;
+    }
+
     virtual std::string toString() const
     {
         return "[\"" + getClassName(this) + "\" \"" + escape_string(value) + "\" " + (close_tag ? "close " : "") + attr.toString() + "]";

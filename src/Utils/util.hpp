@@ -3,14 +3,26 @@
 #define _COWR_UTILS_UTIL
 
 #include <algorithm>
-#include <cxxabi.h>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
 
+#ifdef __GNUC__
+
+#include <cxxabi.h>
+
+#endif
+
 namespace cowr {
+
+#define DEBUG_THROW(type, msg) ({               \
+    std::stringstream ss;                       \
+    ss << "At " << __FILE__ << ":" << __LINE__; \
+    ss << " " << msg;                           \
+    type(ss.str());                             \
+})
 
 // //Copied from cppreference
 
@@ -71,7 +83,10 @@ std::string getClassName(T&& p)
 {
     const std::type_info* pinfo;
     if constexpr (std::is_pointer_v<T>) {
-        pinfo = &getPointedType(p);
+        if (p == nullptr)
+            pinfo = &typeid(nullptr);
+        else
+            pinfo = &getPointedType(p);
     } else {
         pinfo = &typeid(p);
     }
