@@ -24,6 +24,11 @@ namespace cowr {
     type(ss.str());                             \
 })
 
+class Object {
+public:
+    virtual ~Object() = default;
+};
+
 // //Copied from cppreference
 
 // struct nonesuch {
@@ -86,7 +91,7 @@ std::string getClassName(T&& p)
         if (p == nullptr)
             pinfo = &typeid(nullptr);
         else
-            pinfo = &getPointedType(p);
+            pinfo = &getPointedType(reinterpret_cast<const Object*>(p));
     } else {
         pinfo = &typeid(p);
     }
